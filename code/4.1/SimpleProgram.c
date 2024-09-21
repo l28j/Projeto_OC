@@ -2,7 +2,7 @@
 #include "L1Cache.h"
 
 int main(){
-    
+
     srand(0);
 
     int clock1, value;
