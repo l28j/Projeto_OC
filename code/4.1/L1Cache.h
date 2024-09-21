@@ -24,12 +24,13 @@ typedef struct CacheLine {
   uint8_t Valid;
   uint8_t Dirty;
   uint32_t Tag;
+  uint8_t Block[BLOCK_SIZE];
 } CacheLine;
 
-typedef struct Cache {
+typedef struct L1Cache {
   uint32_t init;
-  CacheLine line;
-} Cache;
+  CacheLine lines[L1_LINES];
+} L1Cache;
 
 /*********************** Interfaces *************************/
 
