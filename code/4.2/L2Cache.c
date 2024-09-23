@@ -11,11 +11,11 @@ uint32_t getOffset(uint32_t address) {
   return address & 0x3F;
 }
 uint32_t getLineIndex(uint32_t address) { 
-  return (address >> 6) & 0xFF;
+  return (address >> 6) & 0x1FF;
 }
 
 uint32_t getTag(uint32_t address) { 
-  return (address >> 14);
+  return (address >> 15);
 }
 /**************** Time Manipulation ***************/
 void resetTime() { time = 0; }

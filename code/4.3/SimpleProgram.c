@@ -1,5 +1,5 @@
 
-#include "L2Cache.h"
+#include "L2CacheW.h"
 
 int main()
 {

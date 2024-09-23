@@ -1,4 +1,5 @@
-#include "L2Cache.h"
+#include "L2CacheW.h"
+#include "Cache.h"
 
 uint8_t DRAM[DRAM_SIZE];
 uint32_t time;
@@ -55,11 +56,13 @@ void initCacheL1()
 
 void initCacheL2()
 {
-    for (int i = 0; i < L2_LINES; i++) {
-        cacheL2.lines[i].Valid = 0;
-        cacheL2.lines[i].Dirty = 0;
-        cacheL2.lines[i].Tag = 0;
-        memset(cacheL2.lines[i].Block, 0, BLOCK_SIZE);
+    for (int i = 0; i < N_WAYS; i++){
+        for (int s; s < L2_LINES; s ++){
+            cacheL2.sets[i].lines[s].Valid = 0;
+            cacheL2.sets[i].lines[s].Dirty = 0;
+            cacheL2.sets[i].lines[s].Tag = 0;
+            memset(cacheL2.sets[s].lines[i].Block, 0, BLOCK_SIZE);
+        }
     }
 }
 
@@ -72,6 +75,12 @@ void initCache()
     initDram();
 }
 
+
+
+/// Estava a pôr o ciclo for e fazer o LRU
+
+
+
 /*********************** L2 cache *************************/
 void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
 
@@ -81,7 +90,8 @@ void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
     index = getLineIndex(address);
     Tag = getTag(address);  
 
-    CacheLine *Line = &cacheL2.lines[index];
+
+    CacheLine *Line = &cacheL2.sets[].lines[index];
 
     /*MISS*/
     if(!Line->Valid || Line->Tag != Tag) {
@@ -108,17 +118,17 @@ void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
         }
     }
     /*HIT*/
-    else {
-        if (mode == MODE_WRITE) {
-            Line->Dirty = 1;
-            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            time += L2_WRITE_TIME;
-        } else {
-            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-            time += L2_READ_TIME;
-        }
-    } 
+    if (mode == MODE_WRITE) {
+        Line->Dirty = 1;
+        memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
+        time += L2_WRITE_TIME;
+    } else {
+        memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
+        time += L2_READ_TIME;
+    }
+
 }
+
 /*********************** L1 cache *************************/
 void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
 

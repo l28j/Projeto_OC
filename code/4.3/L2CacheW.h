@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include "Cache.h"
 
+#define N_WAYS 2 // number of ways to be used in set associative cache
+
 void resetTime();
 
 uint32_t getTime();
@@ -27,9 +29,14 @@ typedef struct CacheLine {
   uint8_t Block[BLOCK_SIZE];
 } CacheLine;
 
+typedef struct Set {
+  CacheLine lines[L2_LINES / N_WAYS];
+} Set;
+
+
 typedef struct L2Cache {
   uint32_t init;
-  CacheLine lines[L2_LINES];
+  Set sets[N_WAYS];
 } L2Cache;
 
 typedef struct L1Cache {

@@ -3,7 +3,7 @@ CFLAGS=-Wall -Wextra
 TARGET=SimpleCache
 
 all:
-	$(CC) $(CFLAGS) SimpleProgram.c L2Cache.c -o $(TARGET)
+	$(CC) $(CFLAGS) SimpleProgram.c L2CacheW.c -o $(TARGET)
 
 test:
 	./$(TARGET) > 4.3_results.txt
