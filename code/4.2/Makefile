@@ -7,6 +7,7 @@ all:
 
 test:
 	./$(TARGET) > 4.2_results.txt
-
+	diff 4.2_results.txt results_L2_1W.txt
 clean:
 	rm $(TARGET)
+	rm 4.2_results.txt

@@ -1,135 +1,70 @@
 #include "L2CacheW.h"
-#include "Cache.h"
 
 uint8_t DRAM[DRAM_SIZE];
 uint32_t time;
-L1Cache cacheL1;
-L2Cache cacheL2;
+L1Cache CashL1;
+L2Cache CashL2;
 
 
-/**************** Adress Manipulation ***************/
-uint32_t getOffset(uint32_t address) { 
-  return address & 0x3F;
-}
-uint32_t getLineIndex(uint32_t address) { 
-  return (address >> 6) & 0xFF;
-}
+/**************** Utils ***************/
 
-uint32_t getTag(uint32_t address) { 
-  return (address >> 14);
-}
+uint32_t getOffset(uint32_t address) { return address & 0x3F; }
+uint32_t getLineIndex(uint32_t address) { return (address >> 6) & 0xFF;}
+uint32_t getTag(uint32_t address) { return (address >> 14);}
+
+
 /**************** Time Manipulation ***************/
 void resetTime() { time = 0; }
 
 uint32_t getTime() { return time; }
 
 /****************  RAM memory (byte addressable) ***************/
-void accessDRAM(uint32_t address, uint8_t *data, uint32_t mode)
-{
+void accessDRAM(uint32_t address, uint8_t *data, uint32_t mode) {
 
-    if (address >= DRAM_SIZE - WORD_SIZE + 1)
-        exit(-1);
+  if (address >= DRAM_SIZE - WORD_SIZE + 1)
+    exit(-1);
 
-    if (mode == MODE_READ)
-    {
-        memcpy(data, &(DRAM[address]), BLOCK_SIZE);
-        time += DRAM_READ_TIME;
-    }
+  if (mode == MODE_READ) {
+    memcpy(data, &(DRAM[address]), BLOCK_SIZE);
+    time += DRAM_READ_TIME;
+  }
 
-    if (mode == MODE_WRITE)
-    {
-        memcpy(&(DRAM[address]), data, BLOCK_SIZE);
-        time += DRAM_WRITE_TIME;
-    }
+  if (mode == MODE_WRITE) {
+    memcpy(&(DRAM[address]), data, BLOCK_SIZE);
+    time += DRAM_WRITE_TIME;
+  }
 }
 
-/*********************** Initialize the cache *************************/
-void initCacheL1()
-{
+/*********************** L1 cache *************************/
+
+void initCacheL1(){
     for (int i = 0; i < L1_LINES; i++) {
-        cacheL1.lines[i].Valid = 0;
-        cacheL1.lines[i].Dirty = 0;
-        cacheL1.lines[i].Tag = 0;
-        memset(cacheL1.lines[i].Block, 0, BLOCK_SIZE);
+        CashL1.line[i].Valid = 0;
+        CashL1.line[i].Dirty = 0;
+        CashL1.line[i].Tag = 0;
+        memset(CashL1.line[i].Block, 0, BLOCK_SIZE);
     }
 }
 
 void initCacheL2()
 {
-    for (int i = 0; i < N_WAYS; i++){
-        for (int s; s < L2_LINES; s ++){
-            cacheL2.sets[i].lines[s].Valid = 0;
-            cacheL2.sets[i].lines[s].Dirty = 0;
-            cacheL2.sets[i].lines[s].Tag = 0;
-            memset(cacheL2.sets[s].lines[i].Block, 0, BLOCK_SIZE);
+    for (int i = 0; i < L2_SETS; i++) {
+        for (int j = 0; j < WAYS; j++) {
+            CashL2.sets[i].line[j].Valid = 0;
+            CashL2.sets[i].line[j].Dirty = 0;
+            CashL2.sets[i].line[j].Tag = 0;
+            memset(CashL2.sets[i].line[j].Block, 0, BLOCK_SIZE);
         }
     }
 }
 
 void initDram(){ memset(DRAM, 0, DRAM_SIZE); }
 
-void initCache()
-{
+void initCache(){
     initCacheL1();
     initCacheL2();
     initDram();
 }
-
-
-
-/// Estava a pôr o ciclo for e fazer o LRU
-
-
-
-/*********************** L2 cache *************************/
-void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
-
-    uint32_t index, Tag, MemAddress, blockOffset;
-    
-    blockOffset = getOffset(address);
-    index = getLineIndex(address);
-    Tag = getTag(address);  
-
-
-    CacheLine *Line = &cacheL2.sets[].lines[index];
-
-    /*MISS*/
-    if(!Line->Valid || Line->Tag != Tag) {
-        
-        if (Line->Dirty){
-            MemAddress = address - blockOffset;
-            accessDRAM(MemAddress, Line->Block, MODE_WRITE);
-        }
-
-        MemAddress = address - blockOffset;
-        accessDRAM(MemAddress, Line->Block, MODE_READ);
-
-        Line->Valid = 1;
-        Line->Tag = Tag;
-
-        if (mode == MODE_WRITE) {
-            Line->Dirty = 1;
-            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            time += L2_WRITE_TIME;
-        } else {
-            Line->Dirty = 0;
-            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-            time += L2_READ_TIME;
-        }
-    }
-    /*HIT*/
-    if (mode == MODE_WRITE) {
-        Line->Dirty = 1;
-        memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-        time += L2_WRITE_TIME;
-    } else {
-        memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-        time += L2_READ_TIME;
-    }
-
-}
-
-/*********************** L1 cache *************************/
 void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
 
     uint32_t index, Tag, MemAddress, blockOffset;
@@ -138,7 +73,7 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
     index = getLineIndex(address);
     Tag = getTag(address);  
 
-    CacheLine *Line = &cacheL1.lines[index];
+    CacheLine *Line = &CashL1.line[index];
 
     /*MISS*/
     if(!Line->Valid || Line->Tag != Tag) {
@@ -176,13 +111,78 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
         }
     } 
 }
-    
-void read(uint32_t address, uint8_t *data)
-{
-    accessL1(address, data, MODE_READ);
+
+void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
+    uint32_t index, Tag, MemAddress, blockOffset;
+
+    blockOffset = getOffset(address);
+    index = getLineIndex(address);
+    Tag = getTag(address);
+    MemAddress = address - blockOffset;
+
+    for (int i = 0; i < WAYS; i++) {
+        CacheLine *Line = &CashL2.sets[index].line[i];
+
+        /* HIT */
+        if(Line->Valid && Line->Tag == Tag) {
+            if (mode == MODE_WRITE) {
+                memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
+            if (mode == MODE_READ) {
+                memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
+                time += L2_READ_TIME;
+            }
+            Line->Dirty = 1;
+            time += L2_WRITE_TIME;
+            }
+            Line->Time = getTime();
+            return;
+        } 
+    }
+
+    /* MISS */
+
+    uint32_t oldestTime = CashL2.sets[index].line[0].Time;
+    uint32_t oldestIndex = 0;
+
+    for(int i = 0; i < WAYS; i++) {
+        uint32_t current_time = CashL2.sets[index].line[i].Time;
+
+        if(current_time > oldestTime) {
+        oldestTime = CashL2.sets[index].line[i].Time;
+        oldestIndex = i;
+        }
+    }
+
+    CacheLine *Line = &CashL2.sets[index].line[oldestIndex];
+
+    if(Line->Dirty) {
+        accessDRAM(MemAddress, Line->Block, MODE_WRITE);
+    }
+
+    accessDRAM(MemAddress, Line->Block, MODE_READ);
+
+    Line->Valid = 1;
+    Line->Tag = Tag;
+    Line->Time = getTime();
+
+    if(mode == MODE_READ) {
+        memcpy(data, &Line->Block[blockOffset], WORD_SIZE);
+        Line->Dirty = 0;
+        time += L2_READ_TIME;
+    }
+
+    if(mode == MODE_WRITE) {
+        memcpy(&Line->Block[blockOffset], data, WORD_SIZE);
+        Line->Dirty = 1;
+        time += L2_WRITE_TIME;
+    }
+
 }
 
-void write(uint32_t address, uint8_t *data)
-{
-    accessL1(address, data, MODE_WRITE);
+void read(uint32_t address, uint8_t *data) {
+  accessL1(address, data, MODE_READ);
+}
+
+void write(uint32_t address, uint8_t *data) {
+  accessL1(address, data, MODE_WRITE);
 }

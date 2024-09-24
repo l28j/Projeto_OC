@@ -7,16 +7,15 @@ L2Cache cacheL2;
 
 
 /**************** Adress Manipulation ***************/
-uint32_t getOffset(uint32_t address) { 
-  return address & 0x3F;
-}
-uint32_t getLineIndex(uint32_t address) { 
-  return (address >> 6) & 0x1FF;
-}
+uint32_t getOffsetL2(uint32_t address) { return address & 0x3F;}
+uint32_t getLineIndexL2(uint32_t address) { return (address >> 6) & 0x1FF; }
+uint32_t getTagL2(uint32_t address) { return (address >> 15); }
 
-uint32_t getTag(uint32_t address) { 
-  return (address >> 15);
-}
+
+uint32_t getOffsetL1(uint32_t address) { return address & 0x3F; }
+uint32_t getLineIndexL1(uint32_t address) { return (address >> 6) & 0xFF;}
+uint32_t getTagL1(uint32_t address) { return (address >> 14);}
+
 /**************** Time Manipulation ***************/
 void resetTime() { time = 0; }
 
@@ -77,9 +76,10 @@ void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
 
     uint32_t index, Tag, MemAddress, blockOffset;
     
-    blockOffset = getOffset(address);
-    index = getLineIndex(address);
-    Tag = getTag(address);  
+    blockOffset = getOffsetL2(address);
+    index = getLineIndexL2(address);
+    Tag = getTagL2(address);  
+    MemAddress = address - blockOffset;
 
     CacheLine *Line = &cacheL2.lines[index];
 
@@ -87,11 +87,8 @@ void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
     if(!Line->Valid || Line->Tag != Tag) {
         
         if (Line->Dirty){
-            MemAddress = address - blockOffset;
             accessDRAM(MemAddress, Line->Block, MODE_WRITE);
         }
-
-        MemAddress = address - blockOffset;
         accessDRAM(MemAddress, Line->Block, MODE_READ);
 
         Line->Valid = 1;
@@ -124,9 +121,10 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
 
     uint32_t index, Tag, MemAddress, blockOffset;
     
-    blockOffset = getOffset(address);
-    index = getLineIndex(address);
-    Tag = getTag(address);  
+    blockOffset = getOffsetL1(address);
+    index = getLineIndexL1(address);
+    Tag = getTagL1(address);  
+    MemAddress = address - blockOffset;
 
     CacheLine *Line = &cacheL1.lines[index];
 
@@ -134,11 +132,8 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
     if(!Line->Valid || Line->Tag != Tag) {
         
         if (Line->Dirty){
-            MemAddress = address - blockOffset;
             accessL2(MemAddress, Line->Block, MODE_WRITE);
         }
-
-        MemAddress = address - blockOffset;
         accessL2(MemAddress, Line->Block, MODE_READ);
 
         Line->Valid = 1;

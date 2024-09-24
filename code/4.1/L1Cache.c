@@ -16,7 +16,6 @@ void initL1() {
         SimpleCache.lines[i].Valid = 0;
         SimpleCache.lines[i].Dirty = 0;
         SimpleCache.lines[i].Tag = 0;
-
         memset(SimpleCache.lines[i].Block, 0, BLOCK_SIZE);
     }
 }
@@ -28,16 +27,9 @@ void initCache() {
 
 /**************** Adress Manipulation ***************/
 
-uint32_t getOffset(uint32_t address) { 
-  return address & 0x3F;
-}
-uint32_t getLineIndex(uint32_t address) { 
-  return (address >> 6) & 0xFF;
-}
-
-uint32_t getTag(uint32_t address) { 
-  return (address >> 14);
-}
+uint32_t getOffset(uint32_t address) { return address & 0x3F; }
+uint32_t getLineIndex(uint32_t address) { return (address >> 6) & 0xFF;}
+uint32_t getTag(uint32_t address) { return (address >> 14);}
 
 /**************** Time Manipulation ***************/
 void resetTime() { time = 0; }
@@ -65,12 +57,12 @@ void accessDRAM(uint32_t address, uint8_t *data, uint32_t mode) {
 
 
 void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
-
     uint32_t index, Tag, MemAddress, blockOffset;
     
     blockOffset = getOffset(address);
     index = getLineIndex(address);
     Tag = getTag(address);  
+    MemAddress = address - blockOffset;
 
     CacheLine *Line = &SimpleCache.lines[index];
 
@@ -78,11 +70,9 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
     if(!Line->Valid || Line->Tag != Tag) {
         
         if (Line->Dirty){
-            MemAddress = address - blockOffset;
             accessDRAM(MemAddress, Line->Block, MODE_WRITE);
         }
 
-        MemAddress = address - blockOffset;
         accessDRAM(MemAddress, Line->Block, MODE_READ);
 
         Line->Valid = 1;
