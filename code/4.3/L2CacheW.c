@@ -2,8 +2,8 @@
 
 uint8_t DRAM[DRAM_SIZE];
 uint32_t time;
-L1Cache CashL1;
-L2Cache CashL2;
+L1Cache cacheL1;
+L2Cache cacheL2;
 
 
 /**************** Utils ***************/
@@ -35,14 +35,13 @@ void accessDRAM(uint32_t address, uint8_t *data, uint32_t mode) {
   }
 }
 
-/*********************** L1 cache *************************/
-
+/*********************** Initializations *************************/
 void initCacheL1(){
     for (int i = 0; i < L1_LINES; i++) {
-        CashL1.line[i].Valid = 0;
-        CashL1.line[i].Dirty = 0;
-        CashL1.line[i].Tag = 0;
-        memset(CashL1.line[i].Block, 0, BLOCK_SIZE);
+        cacheL1.lines[i].Valid = 0;
+        cacheL1.lines[i].Dirty = 0;
+        cacheL1.lines[i].Tag = 0;
+        memset(cacheL1.lines[i].Block, 0, BLOCK_SIZE);
     }
 }
 
@@ -50,10 +49,10 @@ void initCacheL2()
 {
     for (int i = 0; i < SETS_L2; i++) {
         for (int j = 0; j < WAYS; j++) {
-            CashL2.sets[i].line[j].Valid = 0;
-            CashL2.sets[i].line[j].Dirty = 0;
-            CashL2.sets[i].line[j].Tag = 0;
-            memset(CashL2.sets[i].line[j].Block, 0, BLOCK_SIZE);
+            cacheL2.sets[i].lines[j].Valid = 0;
+            cacheL2.sets[i].lines[j].Dirty = 0;
+            cacheL2.sets[i].lines[j].Tag = 0;
+            memset(cacheL2.sets[i].lines[j].Block, 0, BLOCK_SIZE);
         }
     }
 }
@@ -65,13 +64,15 @@ void initCache(){
     initCacheL2();
     initDram();
 }
+
+/*********************** L1 cache *************************/
 void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
 
     uint32_t index, Tag, MemAddress, blockOffset;
     blockOffset = getOffset(address);
     index = getLineIndex(address);
     Tag = getTag(address);  
-    CacheLine *Line = &CashL1.line[index];
+    CacheLine *Line = &cacheL1.lines[index];
 
     // Check if block is in cache L1
     if (Line->Valid && Line->Tag == Tag){
@@ -113,6 +114,7 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
     }
 }
 
+/*********************** L2 cache *************************/
 void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
     
     uint32_t index, Tag, MemAddress, blockOffset;
@@ -124,7 +126,7 @@ void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
 
     // Check if block is in cache
     for (int i = 0; i < WAYS; i++) {
-        CacheLine *Line = &CashL2.sets[index].line[i];
+        CacheLine *Line = &cacheL2.sets[index].lines[i];
 
         if(Line->Valid && Line->Tag == Tag) {
             // Write
@@ -146,18 +148,18 @@ void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
     // Block is not in cache
 
     // Search for least recently used (LRU)
-    uint32_t oldest = CashL2.sets[index].line[0].Time;
+    uint32_t oldest = cacheL2.sets[index].lines[0].Time;
     uint32_t lru = 0;
     for(int i = 0; i < WAYS; i++) {
-        uint32_t block_time = CashL2.sets[index].line[i].Time;
+        uint32_t block_time = cacheL2.sets[index].lines[i].Time;
         if(block_time > oldest) {
-            oldest = CashL2.sets[index].line[i].Time;
+            oldest = cacheL2.sets[index].lines[i].Time;
             lru = i;
         }
     }
 
     // Evicting LRU block
-    CacheLine *Line = &CashL2.sets[index].line[lru];
+    CacheLine *Line = &cacheL2.sets[index].lines[lru];
     // Save if LRU was dirty
     if(Line->Dirty) {
         accessDRAM(MemAddress, Line->Block, MODE_WRITE);

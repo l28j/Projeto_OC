@@ -7,11 +7,12 @@ L2Cache cacheL2;
 
 
 /**************** Adress Manipulation ***************/
+// cache L2
 uint32_t getOffsetL2(uint32_t address) { return address & 0x3F;}
 uint32_t getLineIndexL2(uint32_t address) { return (address >> 6) & 0x1FF; }
 uint32_t getTagL2(uint32_t address) { return (address >> 15); }
 
-
+// cache L1
 uint32_t getOffsetL1(uint32_t address) { return address & 0x3F; }
 uint32_t getLineIndexL1(uint32_t address) { return (address >> 6) & 0xFF;}
 uint32_t getTagL1(uint32_t address) { return (address >> 14);}
@@ -41,7 +42,7 @@ void accessDRAM(uint32_t address, uint8_t *data, uint32_t mode)
     }
 }
 
-/*********************** Initialize the cache *************************/
+/*********************** Initializations *************************/
 void initCacheL1()
 {
     for (int i = 0; i < L1_LINES; i++) {
@@ -71,74 +72,43 @@ void initCache()
     initDram();
 }
 
-/*********************** L2 cache *************************/
-void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
-
-    uint32_t index, Tag, MemAddress, blockOffset;
-    
-    blockOffset = getOffsetL2(address);
-    index = getLineIndexL2(address);
-    Tag = getTagL2(address);  
-    MemAddress = address - blockOffset;
-
-    CacheLine *Line = &cacheL2.lines[index];
-
-    /*MISS*/
-    if(!Line->Valid || Line->Tag != Tag) {
-        
-        if (Line->Dirty){
-            accessDRAM(MemAddress, Line->Block, MODE_WRITE);
-        }
-        accessDRAM(MemAddress, Line->Block, MODE_READ);
-
-        Line->Valid = 1;
-        Line->Tag = Tag;
-
-        if (mode == MODE_WRITE) {
-            Line->Dirty = 1;
-            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            time += L2_WRITE_TIME;
-        } else {
-            Line->Dirty = 0;
-            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-            time += L2_READ_TIME;
-        }
-    }
-    /*HIT*/
-    else {
-        if (mode == MODE_WRITE) {
-            Line->Dirty = 1;
-            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            time += L2_WRITE_TIME;
-        } else {
-            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-            time += L2_READ_TIME;
-        }
-    } 
-}
 /*********************** L1 cache *************************/
 void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
 
     uint32_t index, Tag, MemAddress, blockOffset;
-    
     blockOffset = getOffsetL1(address);
     index = getLineIndexL1(address);
     Tag = getTagL1(address);  
-    MemAddress = address - blockOffset;
+    CacheLine *Line = &cacheL2.lines[index];
 
-    CacheLine *Line = &cacheL1.lines[index];
+    // Check if block is in cache L1
+    if (Line->Valid && Line->Tag == Tag){
+        if (mode == MODE_WRITE) {
+            Line->Dirty = 1;
+            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
+            time += L1_WRITE_TIME;
+        } 
+        else {
+            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
+            time += L1_READ_TIME;
+        }
+    }
 
-    /*MISS*/
-    if(!Line->Valid || Line->Tag != Tag) {
-        
+    // If block is not in cache L1
+    else {
+        // If block is dirty, save it in cache L2
         if (Line->Dirty){
+            MemAddress = address - blockOffset;
             accessL2(MemAddress, Line->Block, MODE_WRITE);
         }
+
+        // Ask cache L2 to get the block
+        MemAddress = address - blockOffset;
         accessL2(MemAddress, Line->Block, MODE_READ);
 
         Line->Valid = 1;
         Line->Tag = Tag;
-
+        // Write or Read on the block requested
         if (mode == MODE_WRITE) {
             Line->Dirty = 1;
             memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
@@ -149,17 +119,51 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
             time += L1_READ_TIME;
         }
     }
-    /*HIT*/
-    else {
+}
+
+/*********************** L2 cache *************************/
+void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
+
+    uint32_t index, Tag, MemAddress, blockOffset;
+    blockOffset = getOffsetL2(address);
+    index = getLineIndexL2(address);
+    Tag = getTagL2(address);  
+    MemAddress = address - blockOffset;
+    CacheLine *Line = &cacheL2.lines[index];
+
+    // Check if block is in cache L2
+    if (Line ->Valid && Line->Tag == Tag){
         if (mode == MODE_WRITE) {
             Line->Dirty = 1;
             memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            time += L1_WRITE_TIME;
+            time += L2_WRITE_TIME;
         } else {
             memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-            time += L1_READ_TIME;
+            time += L2_READ_TIME;
         }
-    } 
+    }
+
+    // If block is not in cache L2
+    else {
+        // If block is dirty, save it in memory
+        if (Line->Dirty){
+            accessDRAM(MemAddress, Line->Block, MODE_WRITE);
+        }
+        accessDRAM(MemAddress, Line->Block, MODE_READ);
+        Line->Valid = 1;
+        Line->Tag = Tag;
+
+        // Write or Read on the block requested
+        if (mode == MODE_WRITE) {
+            Line->Dirty = 1;
+            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
+            time += L2_WRITE_TIME;
+        } else {
+            Line->Dirty = 0;
+            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
+            time += L2_READ_TIME;
+        }
+    }
 }
     
 void read(uint32_t address, uint8_t *data)

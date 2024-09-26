@@ -33,7 +33,7 @@ typedef struct CacheLine {
 
 
 typedef struct L1Cache {
-  CacheLine line[L1_LINES];
+  CacheLine lines[L1_LINES];
 } L1Cache;
 
 void initL1();
@@ -47,7 +47,7 @@ void accessL1(uint32_t, uint8_t *, uint32_t);
 #define SETS_L2 256
 
 typedef struct Sets {
-  CacheLine line[WAYS];
+  CacheLine lines[WAYS];
 } Sets;
 
 typedef struct L2Cache {
