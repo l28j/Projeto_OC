@@ -48,7 +48,7 @@ void initCacheL1(){
 
 void initCacheL2()
 {
-    for (int i = 0; i < L2_SETS; i++) {
+    for (int i = 0; i < SETS_L2; i++) {
         for (int j = 0; j < WAYS; j++) {
             CashL2.sets[i].line[j].Valid = 0;
             CashL2.sets[i].line[j].Dirty = 0;
@@ -68,27 +68,39 @@ void initCache(){
 void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
 
     uint32_t index, Tag, MemAddress, blockOffset;
-    
     blockOffset = getOffset(address);
     index = getLineIndex(address);
     Tag = getTag(address);  
-
     CacheLine *Line = &CashL1.line[index];
 
-    /*MISS*/
-    if(!Line->Valid || Line->Tag != Tag) {
-        
+    // Check if block is in cache L1
+    if (Line->Valid && Line->Tag == Tag){
+        if (mode == MODE_WRITE) {
+            Line->Dirty = 1;
+            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
+            time += L1_WRITE_TIME;
+        } 
+        else {
+            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
+            time += L1_READ_TIME;
+        }
+    }
+
+    // If block is not in cache L1
+    else {
+        // If block is dirty, save it in cache L2
         if (Line->Dirty){
             MemAddress = address - blockOffset;
             accessL2(MemAddress, Line->Block, MODE_WRITE);
         }
 
+        // Ask cache L2 to get the block
         MemAddress = address - blockOffset;
         accessL2(MemAddress, Line->Block, MODE_READ);
 
         Line->Valid = 1;
         Line->Tag = Tag;
-
+        // Write or Read on the block requested
         if (mode == MODE_WRITE) {
             Line->Dirty = 1;
             memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
@@ -99,84 +111,73 @@ void accessL1(uint32_t address, uint8_t *data, uint32_t mode) {
             time += L1_READ_TIME;
         }
     }
-    /*HIT*/
-    else {
-        if (mode == MODE_WRITE) {
-            Line->Dirty = 1;
-            memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            time += L1_WRITE_TIME;
-        } else {
-            memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
-            time += L1_READ_TIME;
-        }
-    } 
 }
 
 void accessL2(uint32_t address, uint8_t *data, uint32_t mode) {
+    
     uint32_t index, Tag, MemAddress, blockOffset;
-
     blockOffset = getOffset(address);
     index = getLineIndex(address);
     Tag = getTag(address);
     MemAddress = address - blockOffset;
 
+
+    // Check if block is in cache
     for (int i = 0; i < WAYS; i++) {
         CacheLine *Line = &CashL2.sets[index].line[i];
 
-        /* HIT */
         if(Line->Valid && Line->Tag == Tag) {
+            // Write
             if (mode == MODE_WRITE) {
                 memcpy(&(Line->Block[blockOffset]), data, WORD_SIZE);
-            if (mode == MODE_READ) {
+                Line->Dirty = 1;
+                time += L2_WRITE_TIME;
+            }
+            // Read            
+            else{
                 memcpy(data, &(Line->Block[blockOffset]), WORD_SIZE);
                 time += L2_READ_TIME;
-            }
-            Line->Dirty = 1;
-            time += L2_WRITE_TIME;
             }
             Line->Time = getTime();
             return;
         } 
     }
 
-    /* MISS */
+    // Block is not in cache
 
-    uint32_t oldestTime = CashL2.sets[index].line[0].Time;
-    uint32_t oldestIndex = 0;
-
+    // Search for least recently used (LRU)
+    uint32_t oldest = CashL2.sets[index].line[0].Time;
+    uint32_t lru = 0;
     for(int i = 0; i < WAYS; i++) {
-        uint32_t current_time = CashL2.sets[index].line[i].Time;
-
-        if(current_time > oldestTime) {
-        oldestTime = CashL2.sets[index].line[i].Time;
-        oldestIndex = i;
+        uint32_t block_time = CashL2.sets[index].line[i].Time;
+        if(block_time > oldest) {
+            oldest = CashL2.sets[index].line[i].Time;
+            lru = i;
         }
     }
 
-    CacheLine *Line = &CashL2.sets[index].line[oldestIndex];
-
+    // Evicting LRU block
+    CacheLine *Line = &CashL2.sets[index].line[lru];
+    // Save if LRU was dirty
     if(Line->Dirty) {
         accessDRAM(MemAddress, Line->Block, MODE_WRITE);
     }
-
     accessDRAM(MemAddress, Line->Block, MODE_READ);
 
+    // Insert the new block
     Line->Valid = 1;
     Line->Tag = Tag;
     Line->Time = getTime();
-
     if(mode == MODE_READ) {
         memcpy(data, &Line->Block[blockOffset], WORD_SIZE);
         Line->Dirty = 0;
         time += L2_READ_TIME;
     }
-
-    if(mode == MODE_WRITE) {
+    else{
         memcpy(&Line->Block[blockOffset], data, WORD_SIZE);
         Line->Dirty = 1;
         time += L2_WRITE_TIME;
     }
-
 }
 
 void read(uint32_t address, uint8_t *data) {

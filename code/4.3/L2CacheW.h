@@ -42,17 +42,16 @@ void accessL1(uint32_t, uint8_t *, uint32_t);
 
 /*********************** L2Cache *************************/
 
-//L2_SETS = L2_SIZE / BLOCK_SIZE / WAYS = 256
-
-#define L2_SETS 256
+// SETS_L2 = Number of Blocks / WAYS = 256
 #define WAYS 2
+#define SETS_L2 256
 
 typedef struct Sets {
   CacheLine line[WAYS];
 } Sets;
 
 typedef struct L2Cache {
-  Sets sets[L2_SETS];
+  Sets sets[SETS_L2];
 } L2Cache;
 
 void accessL2(uint32_t, uint8_t *, uint32_t);
