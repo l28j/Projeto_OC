@@ -24,9 +24,8 @@ loop:       lw $10, 0($2)
             dmul $12, $10, $11 
             dadd $12, $12, $10
             sw $12, 0($4)
-
             daddi $1, $1, 1
-            daddi $2, $2, 8
+            daddi $2, $2, 8                        
             daddi $3, $3, 8
             daddi $4, $4, 8
             bne $1, $5, loop
